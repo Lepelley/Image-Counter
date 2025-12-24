@@ -128,6 +128,13 @@ public:
         InvalidateRect(hwnd, nullptr, TRUE);
     }
     
+    void allowDarkModeForControl(HWND hwnd) {
+        if (m_allowDarkModeForWindow && m_isDark) {
+            m_allowDarkModeForWindow(hwnd, true);
+            SendMessageW(hwnd, WM_THEMECHANGED, 0, 0);
+        }
+    }
+    
     static bool isSystemDarkTheme() {
         HKEY hKey;
         DWORD value = 1;
