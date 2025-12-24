@@ -993,17 +993,25 @@ void MainWindow::updateUIForCurrentTab() {
     SetWindowTextW(m_staticStep, stepText.c_str());
     
     // Mettre à jour la prévisualisation
+    HBITMAP oldPreview = nullptr;
     if (tab->previewBitmap) {
-        SendMessage(m_staticPreview, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM)tab->previewBitmap);
+        oldPreview = (HBITMAP)SendMessage(m_staticPreview, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM)tab->previewBitmap);
     } else {
-        SendMessage(m_staticPreview, STM_SETIMAGE, IMAGE_BITMAP, 0);
+        oldPreview = (HBITMAP)SendMessage(m_staticPreview, STM_SETIMAGE, IMAGE_BITMAP, 0);
+    }
+    if (oldPreview && oldPreview != tab->previewBitmap) {
+        DeleteObject(oldPreview);
     }
     
     // Mettre à jour la prévisualisation de la capture
+    HBITMAP oldCapture = nullptr;
     if (tab->captureBitmap) {
-        SendMessage(m_staticCapture, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM)tab->captureBitmap);
+        oldCapture = (HBITMAP)SendMessage(m_staticCapture, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM)tab->captureBitmap);
     } else {
-        SendMessage(m_staticCapture, STM_SETIMAGE, IMAGE_BITMAP, 0);
+        oldCapture = (HBITMAP)SendMessage(m_staticCapture, STM_SETIMAGE, IMAGE_BITMAP, 0);
+    }
+    if (oldCapture && oldCapture != tab->captureBitmap) {
+        DeleteObject(oldCapture);
     }
     
     // Mettre à jour les boutons
@@ -1096,7 +1104,10 @@ void MainWindow::updatePreviewForTab(CounterTab* tab, const cv::Mat& image) {
     
     // Afficher si c'est l'onglet courant
     if (tab == currentTab()) {
-        SendMessage(m_staticPreview, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM)tab->previewBitmap);
+        HBITMAP oldBitmap = (HBITMAP)SendMessage(m_staticPreview, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM)tab->previewBitmap);
+        if (oldBitmap && oldBitmap != tab->previewBitmap) {
+            DeleteObject(oldBitmap);
+        }
     }
 }
 
@@ -1107,7 +1118,7 @@ void MainWindow::updateCapturePreview(CounterTab* tab) {
     cv::Mat capture = tab->detector->captureRegion();
     if (capture.empty()) return;
     
-    // Supprimer l'ancien bitmap
+    // Supprimer l'ancien bitmap stocké dans le tab
     if (tab->captureBitmap) {
         DeleteObject(tab->captureBitmap);
         tab->captureBitmap = nullptr;
@@ -1137,7 +1148,11 @@ void MainWindow::updateCapturePreview(CounterTab* tab) {
     
     // Afficher si c'est l'onglet courant
     if (tab == currentTab()) {
-        SendMessage(m_staticCapture, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM)tab->captureBitmap);
+        // STM_SETIMAGE retourne l'ancien bitmap, il faut le supprimer
+        HBITMAP oldBitmap = (HBITMAP)SendMessage(m_staticCapture, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM)tab->captureBitmap);
+        if (oldBitmap && oldBitmap != tab->captureBitmap) {
+            DeleteObject(oldBitmap);
+        }
     }
 }
 
@@ -2065,18 +2080,34 @@ void MainWindow::showHistory() {
     auto* tab = currentTab();
     if (!tab) return;
     
-    // Créer la fenêtre de dialogue pour l'historique
-    const wchar_t* className = L"HistoryDialogClass";
+    bool isDark = ThemeManager::getInstance().isDarkTheme();
     
-    WNDCLASSEXW wc = {};
-    wc.cbSize = sizeof(wc);
-    wc.lpfnWndProc = DefWindowProcW;
-    wc.hInstance = m_hInstance;
-    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wc.hbrBackground = ThemeManager::getInstance().isDarkTheme() ? 
-        CreateSolidBrush(RGB(32, 32, 32)) : (HBRUSH)(COLOR_BTNFACE + 1);
-    wc.lpszClassName = className;
-    RegisterClassExW(&wc);
+    // Créer la fenêtre de dialogue pour l'historique
+    static bool classRegistered = false;
+    static bool classRegisteredDark = false;
+    const wchar_t* className = isDark ? L"HistoryDialogClassDark" : L"HistoryDialogClass";
+    
+    if (isDark && !classRegisteredDark) {
+        WNDCLASSEXW wc = {};
+        wc.cbSize = sizeof(wc);
+        wc.lpfnWndProc = DefWindowProcW;
+        wc.hInstance = m_hInstance;
+        wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+        wc.hbrBackground = CreateSolidBrush(RGB(32, 32, 32));
+        wc.lpszClassName = className;
+        RegisterClassExW(&wc);
+        classRegisteredDark = true;
+    } else if (!isDark && !classRegistered) {
+        WNDCLASSEXW wc = {};
+        wc.cbSize = sizeof(wc);
+        wc.lpfnWndProc = DefWindowProcW;
+        wc.hInstance = m_hInstance;
+        wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+        wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
+        wc.lpszClassName = className;
+        RegisterClassExW(&wc);
+        classRegistered = true;
+    }
     
     RECT parentRect;
     GetWindowRect(m_hwnd, &parentRect);
@@ -2094,7 +2125,10 @@ void MainWindow::showHistory() {
     
     if (!hwndDialog) return;
     
-    bool isDark = ThemeManager::getInstance().isDarkTheme();
+    // Appliquer le thème sombre à la barre de titre
+    if (isDark) {
+        ThemeManager::getInstance().applyToWindow(hwndDialog);
+    }
     
     // Obtenir la zone client
     RECT clientRect;
@@ -2108,8 +2142,29 @@ void MainWindow::showHistory() {
         10, 10, clientW - 20, clientH - 90,
         hwndDialog, (HMENU)1001, m_hInstance, nullptr);
     
+    // Appliquer le thème sombre à la ListView AVANT d'ajouter les colonnes
+    if (isDark) {
+        // Permettre le dark mode pour la ListView
+        ThemeManager::getInstance().allowDarkModeForControl(listView);
+        SetWindowTheme(listView, L"DarkMode_Explorer", nullptr);
+        ListView_SetBkColor(listView, RGB(32, 32, 32));
+        ListView_SetTextBkColor(listView, RGB(32, 32, 32));
+        ListView_SetTextColor(listView, RGB(255, 255, 255));
+        
+        // Header - permettre le dark mode et appliquer le thème
+        HWND header = ListView_GetHeader(listView);
+        if (header) {
+            ThemeManager::getInstance().allowDarkModeForControl(header);
+            SetWindowTheme(header, L"DarkMode_ItemsView", nullptr);
+        }
+    }
+    
     // Style étendu pour la ListView
-    ListView_SetExtendedListViewStyle(listView, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
+    DWORD exStyle = LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER;
+    if (!isDark) {
+        exStyle |= LVS_EX_GRIDLINES;
+    }
+    ListView_SetExtendedListViewStyle(listView, exStyle);
     
     // Colonnes (largeurs ajustées pour DPI élevé)
     LVCOLUMNW col = {};
@@ -2140,8 +2195,14 @@ void MainWindow::showHistory() {
     col.iSubItem = 4;
     ListView_InsertColumn(listView, 4, &col);
     
-    // Remplir la ListView (du plus récent au plus ancien)
-    for (int i = (int)tab->detectionHistory.size() - 1; i >= 0; i--) {
+    // Remplir la ListView (du plus récent au plus ancien, limité à 1000 entrées)
+    int startIdx = (int)tab->detectionHistory.size() - 1;
+    int endIdx = std::max(0, startIdx - 999);  // Afficher max 1000 entrées
+    
+    // Désactiver le redessin pendant le remplissage
+    SendMessage(listView, WM_SETREDRAW, FALSE, 0);
+    
+    for (int i = startIdx; i >= endIdx; i--) {
         const auto& entry = tab->detectionHistory[i];
         
         wchar_t dateStr[32], timeStr[32], counterStr[32], confStr[32];
@@ -2154,7 +2215,7 @@ void MainWindow::showHistory() {
         
         LVITEMW item = {};
         item.mask = LVIF_TEXT;
-        item.iItem = (int)tab->detectionHistory.size() - 1 - i;
+        item.iItem = startIdx - i;
         item.pszText = dateStr;
         int idx = ListView_InsertItem(listView, &item);
         
@@ -2164,13 +2225,9 @@ void MainWindow::showHistory() {
         ListView_SetItemText(listView, idx, 4, (LPWSTR)entry.windowTitle.c_str());
     }
     
-    // Appliquer le thème sombre à la ListView
-    if (isDark) {
-        ListView_SetBkColor(listView, RGB(32, 32, 32));
-        ListView_SetTextBkColor(listView, RGB(32, 32, 32));
-        ListView_SetTextColor(listView, RGB(255, 255, 255));
-        SetWindowTheme(listView, L"DarkMode_Explorer", nullptr);
-    }
+    // Réactiver le redessin
+    SendMessage(listView, WM_SETREDRAW, TRUE, 0);
+    InvalidateRect(listView, nullptr, TRUE);
     
     // Info sur le nombre d'entrées
     std::wstring infoText = std::to_wstring(tab->detectionHistory.size()) + L" " + 
@@ -2196,11 +2253,20 @@ void MainWindow::showHistory() {
         clientW - 130, clientH - 45, 110, 30,
         hwndDialog, (HMENU)IDCANCEL, m_hInstance, nullptr);
     
-    // Appliquer le thème aux boutons
+    // Appliquer le thème aux boutons et label
     if (isDark) {
         SetWindowTheme(btnExport, L"DarkMode_Explorer", nullptr);
         SetWindowTheme(btnClear, L"DarkMode_Explorer", nullptr);
         SetWindowTheme(btnClose, L"DarkMode_Explorer", nullptr);
+        
+        // Couleur du texte du label (utiliser un sous-classement simple)
+        SetWindowSubclass(labelInfo, [](HWND hWnd, UINT uMsg, WPARAM wParam, 
+            LPARAM lParam, UINT_PTR, DWORD_PTR) -> LRESULT {
+            if (uMsg == WM_CTLCOLORSTATIC || uMsg == WM_ERASEBKGND) {
+                // Laisser le parent gérer
+            }
+            return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+        }, 1, 0);
     }
     
     EnableWindow(m_hwnd, FALSE);

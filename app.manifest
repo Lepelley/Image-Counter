@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
   <assemblyIdentity
-    version="1.0.0.0"
+    version="1.1.0.0"
     processorArchitecture="*"
     name="ImageCounter"
     type="win32"
   />
-  <description>Image Counter - Détecteur d'images pour applications</description>
+  <description>Image Counter - Detecteur d'images pour applications</description>
   <dependency>
     <dependentAssembly>
       <assemblyIdentity
