@@ -452,8 +452,8 @@ void MainWindow::onCreate(HWND hwnd) {
         DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI Emoji");
     
     // === Barre d'onglets ===
-    // Boutons de gestion des onglets à droite
-    int btnX = windowWidth - margin - 90;
+    // Boutons de gestion des onglets à droite (+ et -)
+    int btnX = windowWidth - margin - 60;
     m_btnAddTab = CreateWindowExW(0, L"BUTTON", L"+",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         btnX, y, 28, 26,
@@ -463,11 +463,6 @@ void MainWindow::onCreate(HWND hwnd) {
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
         btnX + 30, y, 28, 26,
         hwnd, (HMENU)IDC_BTN_REMOVE_TAB, m_hInstance, nullptr);
-    
-    m_btnRenameTab = CreateWindowExW(0, L"BUTTON", L"✏",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        btnX + 60, y, 28, 26,
-        hwnd, (HMENU)IDC_BTN_RENAME_TAB, m_hInstance, nullptr);
     
     // Tab Control (plus large maintenant)
     m_tabControl = CreateWindowExW(0, WC_TABCONTROLW, L"",
@@ -679,9 +674,6 @@ void MainWindow::onCommand(HWND hwnd, WPARAM wParam) {
             break;
         case IDC_BTN_REMOVE_TAB:
             removeCurrentTab();
-            break;
-        case IDC_BTN_RENAME_TAB:
-            renameCurrentTab();
             break;
         case IDC_COMBO_WINDOWS:
             if (wmEvent == CBN_SELCHANGE) {
@@ -925,11 +917,6 @@ void MainWindow::removeCurrentTab() {
     
     TabCtrl_SetCurSel(m_tabControl, m_currentTabIndex);
     switchToTab(m_currentTabIndex);
-}
-
-void MainWindow::renameCurrentTab() {
-    // Ouvrir les paramètres directement sur l'onglet Compteur (index 2)
-    showSettings(2);
 }
 
 void MainWindow::switchToTab(int index) {

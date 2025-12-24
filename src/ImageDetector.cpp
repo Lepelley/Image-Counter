@@ -164,10 +164,14 @@ cv::Mat ImageDetector::hwndToMat(HWND hwnd) {
         return cv::Mat();
     }
     
+    // Vérifier si la fenêtre est minimisée
+    if (IsIconic(hwnd)) {
+        return cv::Mat();
+    }
+    
     // Vérifier si la fenêtre répond (timeout de 100ms)
     DWORD_PTR msgResult = 0;
     if (!SendMessageTimeoutW(hwnd, WM_NULL, 0, 0, SMTO_ABORTIFHUNG, 100, &msgResult)) {
-        // La fenêtre ne répond pas, retourner une image vide
         return cv::Mat();
     }
     
@@ -200,8 +204,13 @@ cv::Mat ImageDetector::hwndToMat(HWND hwnd) {
     
     HBITMAP hOldBitmap = (HBITMAP)SelectObject(hdcMem, hBitmap);
     
-    // Utiliser PrintWindow pour capturer même les fenêtres en arrière-plan
-    PrintWindow(hwnd, hdcMem, PW_CLIENTONLY | PW_RENDERFULLCONTENT);
+    // Essayer PrintWindow d'abord (meilleur pour les fenêtres en arrière-plan)
+    BOOL printResult = PrintWindow(hwnd, hdcMem, PW_CLIENTONLY | PW_RENDERFULLCONTENT);
+    
+    // Si PrintWindow échoue ou retourne une image noire, essayer BitBlt
+    if (!printResult) {
+        BitBlt(hdcMem, 0, 0, width, height, hdcWindow, 0, 0, SRCCOPY);
+    }
     
     BITMAPINFOHEADER bi = {};
     bi.biSize = sizeof(BITMAPINFOHEADER);
@@ -218,6 +227,39 @@ cv::Mat ImageDetector::hwndToMat(HWND hwnd) {
     DeleteObject(hBitmap);
     DeleteDC(hdcMem);
     ReleaseDC(hwnd, hdcWindow);
+    
+    // Vérifier si l'image capturée est valide (pas entièrement noire)
+    cv::Mat gray;
+    cv::cvtColor(mat, gray, cv::COLOR_BGRA2GRAY);
+    double minVal, maxVal;
+    cv::minMaxLoc(gray, &minVal, &maxVal);
+    
+    // Si l'image est presque entièrement noire, essayer une autre méthode
+    if (maxVal < 10) {
+        // Réessayer avec BitBlt depuis l'écran si la fenêtre est visible
+        if (IsWindowVisible(hwnd)) {
+            RECT windowRect;
+            GetWindowRect(hwnd, &windowRect);
+            
+            HDC hdcScreen = GetDC(nullptr);
+            HDC hdcMem2 = CreateCompatibleDC(hdcScreen);
+            HBITMAP hBitmap2 = CreateCompatibleBitmap(hdcScreen, width, height);
+            HBITMAP hOldBitmap2 = (HBITMAP)SelectObject(hdcMem2, hBitmap2);
+            
+            // Ajuster pour la zone client
+            POINT clientOrigin = {0, 0};
+            ClientToScreen(hwnd, &clientOrigin);
+            
+            BitBlt(hdcMem2, 0, 0, width, height, hdcScreen, clientOrigin.x, clientOrigin.y, SRCCOPY);
+            
+            GetDIBits(hdcMem2, hBitmap2, 0, height, mat.data, (BITMAPINFO*)&bi, DIB_RGB_COLORS);
+            
+            SelectObject(hdcMem2, hOldBitmap2);
+            DeleteObject(hBitmap2);
+            DeleteDC(hdcMem2);
+            ReleaseDC(nullptr, hdcScreen);
+        }
+    }
     
     cv::Mat result;
     cv::cvtColor(mat, result, cv::COLOR_BGRA2BGR);

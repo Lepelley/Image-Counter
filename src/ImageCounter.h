@@ -366,7 +366,6 @@ private:
     // Gestion des onglets
     void addNewTab();
     void removeCurrentTab();
-    void renameCurrentTab();
     void switchToTab(int index);
     void updateTabControl();
     
@@ -420,7 +419,6 @@ private:
     HWND m_tabControl = nullptr;
     HWND m_btnAddTab = nullptr;
     HWND m_btnRemoveTab = nullptr;
-    HWND m_btnRenameTab = nullptr;
     
     // Contrôles de contenu (partagés, mis à jour selon l'onglet actif)
     HWND m_comboWindows = nullptr;
@@ -463,7 +461,6 @@ private:
     static constexpr int IDC_TAB_CONTROL = 100;
     static constexpr int IDC_BTN_ADD_TAB = 101;
     static constexpr int IDC_BTN_REMOVE_TAB = 102;
-    static constexpr int IDC_BTN_RENAME_TAB = 103;
     static constexpr int IDC_COMBO_WINDOWS = 104;
     static constexpr int IDC_BTN_REFRESH_WINDOWS = 105;
     static constexpr int IDC_BTN_LOAD_IMAGE = 106;
