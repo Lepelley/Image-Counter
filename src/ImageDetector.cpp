@@ -169,9 +169,9 @@ cv::Mat ImageDetector::hwndToMat(HWND hwnd) {
         return cv::Mat();
     }
     
-    // Vérifier si la fenêtre répond (timeout de 100ms)
+    // Vérifier si la fenêtre répond (timeout de 50ms pour être plus réactif)
     DWORD_PTR msgResult = 0;
-    if (!SendMessageTimeoutW(hwnd, WM_NULL, 0, 0, SMTO_ABORTIFHUNG, 100, &msgResult)) {
+    if (!SendMessageTimeoutW(hwnd, WM_NULL, 0, 0, SMTO_ABORTIFHUNG, 50, &msgResult)) {
         return cv::Mat();
     }
     
@@ -184,34 +184,7 @@ cv::Mat ImageDetector::hwndToMat(HWND hwnd) {
         return cv::Mat();
     }
     
-    HDC hdcWindow = GetDC(hwnd);
-    if (!hdcWindow) {
-        return cv::Mat();
-    }
-    
-    HDC hdcMem = CreateCompatibleDC(hdcWindow);
-    if (!hdcMem) {
-        ReleaseDC(hwnd, hdcWindow);
-        return cv::Mat();
-    }
-    
-    HBITMAP hBitmap = CreateCompatibleBitmap(hdcWindow, width, height);
-    if (!hBitmap) {
-        DeleteDC(hdcMem);
-        ReleaseDC(hwnd, hdcWindow);
-        return cv::Mat();
-    }
-    
-    HBITMAP hOldBitmap = (HBITMAP)SelectObject(hdcMem, hBitmap);
-    
-    // Essayer PrintWindow d'abord (meilleur pour les fenêtres en arrière-plan)
-    BOOL printResult = PrintWindow(hwnd, hdcMem, PW_CLIENTONLY | PW_RENDERFULLCONTENT);
-    
-    // Si PrintWindow échoue ou retourne une image noire, essayer BitBlt
-    if (!printResult) {
-        BitBlt(hdcMem, 0, 0, width, height, hdcWindow, 0, 0, SRCCOPY);
-    }
-    
+    // Préparer les structures pour la capture
     BITMAPINFOHEADER bi = {};
     bi.biSize = sizeof(BITMAPINFOHEADER);
     bi.biWidth = width;
@@ -221,43 +194,95 @@ cv::Mat ImageDetector::hwndToMat(HWND hwnd) {
     bi.biCompression = BI_RGB;
     
     cv::Mat mat(height, width, CV_8UC4);
-    GetDIBits(hdcMem, hBitmap, 0, height, mat.data, (BITMAPINFO*)&bi, DIB_RGB_COLORS);
     
-    SelectObject(hdcMem, hOldBitmap);
-    DeleteObject(hBitmap);
-    DeleteDC(hdcMem);
-    ReleaseDC(hwnd, hdcWindow);
+    // Méthode 1: Essayer BitBlt depuis le DC de la fenêtre (rapide, fonctionne pour fenêtres au premier plan)
+    bool captureSuccess = false;
     
-    // Vérifier si l'image capturée est valide (pas entièrement noire)
-    cv::Mat gray;
-    cv::cvtColor(mat, gray, cv::COLOR_BGRA2GRAY);
-    double minVal, maxVal;
-    cv::minMaxLoc(gray, &minVal, &maxVal);
-    
-    // Si l'image est presque entièrement noire, essayer une autre méthode
-    if (maxVal < 10) {
-        // Réessayer avec BitBlt depuis l'écran si la fenêtre est visible
-        if (IsWindowVisible(hwnd)) {
-            RECT windowRect;
-            GetWindowRect(hwnd, &windowRect);
-            
-            HDC hdcScreen = GetDC(nullptr);
-            HDC hdcMem2 = CreateCompatibleDC(hdcScreen);
-            HBITMAP hBitmap2 = CreateCompatibleBitmap(hdcScreen, width, height);
-            HBITMAP hOldBitmap2 = (HBITMAP)SelectObject(hdcMem2, hBitmap2);
-            
-            // Ajuster pour la zone client
-            POINT clientOrigin = {0, 0};
-            ClientToScreen(hwnd, &clientOrigin);
-            
-            BitBlt(hdcMem2, 0, 0, width, height, hdcScreen, clientOrigin.x, clientOrigin.y, SRCCOPY);
-            
-            GetDIBits(hdcMem2, hBitmap2, 0, height, mat.data, (BITMAPINFO*)&bi, DIB_RGB_COLORS);
-            
-            SelectObject(hdcMem2, hOldBitmap2);
-            DeleteObject(hBitmap2);
-            DeleteDC(hdcMem2);
+    if (IsWindowVisible(hwnd)) {
+        // Vérifier si la fenêtre est au premier plan ou partiellement visible
+        RECT windowRect;
+        GetWindowRect(hwnd, &windowRect);
+        
+        POINT clientOrigin = {0, 0};
+        ClientToScreen(hwnd, &clientOrigin);
+        
+        HDC hdcScreen = GetDC(nullptr);
+        if (hdcScreen) {
+            HDC hdcMem = CreateCompatibleDC(hdcScreen);
+            if (hdcMem) {
+                HBITMAP hBitmap = CreateCompatibleBitmap(hdcScreen, width, height);
+                if (hBitmap) {
+                    HBITMAP hOldBitmap = (HBITMAP)SelectObject(hdcMem, hBitmap);
+                    
+                    // Capturer depuis l'écran à la position de la fenêtre
+                    BitBlt(hdcMem, 0, 0, width, height, hdcScreen, clientOrigin.x, clientOrigin.y, SRCCOPY);
+                    GetDIBits(hdcMem, hBitmap, 0, height, mat.data, (BITMAPINFO*)&bi, DIB_RGB_COLORS);
+                    
+                    SelectObject(hdcMem, hOldBitmap);
+                    DeleteObject(hBitmap);
+                    
+                    // Vérifier si la capture est valide (pas noire)
+                    cv::Mat gray;
+                    cv::cvtColor(mat, gray, cv::COLOR_BGRA2GRAY);
+                    double minVal, maxVal;
+                    cv::minMaxLoc(gray, &minVal, &maxVal);
+                    captureSuccess = (maxVal > 15);
+                }
+                DeleteDC(hdcMem);
+            }
             ReleaseDC(nullptr, hdcScreen);
+        }
+    }
+    
+    // Méthode 2: Si BitBlt échoue, essayer PrintWindow
+    if (!captureSuccess) {
+        HDC hdcWindow = GetDC(hwnd);
+        if (hdcWindow) {
+            HDC hdcMem = CreateCompatibleDC(hdcWindow);
+            if (hdcMem) {
+                HBITMAP hBitmap = CreateCompatibleBitmap(hdcWindow, width, height);
+                if (hBitmap) {
+                    HBITMAP hOldBitmap = (HBITMAP)SelectObject(hdcMem, hBitmap);
+                    
+                    // PrintWindow avec PW_RENDERFULLCONTENT pour les fenêtres modernes
+                    PrintWindow(hwnd, hdcMem, PW_CLIENTONLY | PW_RENDERFULLCONTENT);
+                    GetDIBits(hdcMem, hBitmap, 0, height, mat.data, (BITMAPINFO*)&bi, DIB_RGB_COLORS);
+                    
+                    SelectObject(hdcMem, hOldBitmap);
+                    DeleteObject(hBitmap);
+                    
+                    // Vérifier si la capture est valide
+                    cv::Mat gray;
+                    cv::cvtColor(mat, gray, cv::COLOR_BGRA2GRAY);
+                    double minVal, maxVal;
+                    cv::minMaxLoc(gray, &minVal, &maxVal);
+                    captureSuccess = (maxVal > 15);
+                }
+                DeleteDC(hdcMem);
+            }
+            ReleaseDC(hwnd, hdcWindow);
+        }
+    }
+    
+    // Méthode 3: PrintWindow sans PW_RENDERFULLCONTENT (fallback pour anciennes apps)
+    if (!captureSuccess) {
+        HDC hdcWindow = GetDC(hwnd);
+        if (hdcWindow) {
+            HDC hdcMem = CreateCompatibleDC(hdcWindow);
+            if (hdcMem) {
+                HBITMAP hBitmap = CreateCompatibleBitmap(hdcWindow, width, height);
+                if (hBitmap) {
+                    HBITMAP hOldBitmap = (HBITMAP)SelectObject(hdcMem, hBitmap);
+                    
+                    PrintWindow(hwnd, hdcMem, PW_CLIENTONLY);
+                    GetDIBits(hdcMem, hBitmap, 0, height, mat.data, (BITMAPINFO*)&bi, DIB_RGB_COLORS);
+                    
+                    SelectObject(hdcMem, hOldBitmap);
+                    DeleteObject(hBitmap);
+                }
+                DeleteDC(hdcMem);
+            }
+            ReleaseDC(hwnd, hdcWindow);
         }
     }
     

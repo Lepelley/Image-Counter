@@ -642,7 +642,6 @@ void MainWindow::onCreate(HWND hwnd) {
     SendMessage(m_btnStart, WM_SETFONT, (WPARAM)m_buttonFont, TRUE);
     SendMessage(m_btnStop, WM_SETFONT, (WPARAM)m_buttonFont, TRUE);
     SendMessage(m_btnReset, WM_SETFONT, (WPARAM)m_buttonFont, TRUE);
-    SendMessage(m_btnRenameTab, WM_SETFONT, (WPARAM)m_buttonFont, TRUE);
     SendMessage(m_btnCounterMinus, WM_SETFONT, (WPARAM)m_buttonFont, TRUE);
     SendMessage(m_btnCounterPlus, WM_SETFONT, (WPARAM)m_buttonFont, TRUE);
     
@@ -765,6 +764,32 @@ void MainWindow::onTimer(HWND hwnd) {
     // Mettre à jour tous les compteurs actifs
     for (size_t i = 0; i < m_tabs.size(); i++) {
         auto& tab = m_tabs[i];
+        
+        // Vérifier que la fenêtre cible est toujours valide
+        if (tab->targetWindow && !IsWindow(tab->targetWindow)) {
+            // Le handle n'est plus valide, essayer de retrouver la fenêtre par son titre
+            tab->targetWindow = nullptr;
+            tab->detector->setTargetWindow(nullptr);
+            
+            // Chercher la fenêtre par son titre
+            if (!tab->targetWindowTitle.empty()) {
+                auto windows = ImageDetector::enumerateWindows();
+                for (const auto& [hwnd, title] : windows) {
+                    if (title == tab->targetWindowTitle) {
+                        tab->targetWindow = hwnd;
+                        tab->detector->setTargetWindow(hwnd);
+                        break;
+                    }
+                }
+            }
+            
+            // Si toujours pas trouvé et en cours de scan, arrêter
+            if (!tab->targetWindow && tab->isRunning) {
+                tab->detector->stopScanning();
+                tab->isRunning = false;
+            }
+        }
+        
         if (tab->isRunning) {
             // Mettre à jour le nom de l'onglet avec le compteur
             int count = tab->detector->getCounter();
@@ -996,21 +1021,44 @@ void MainWindow::updateUIForCurrentTab() {
 }
 
 void MainWindow::updateWindowList() {
+    // Sauvegarder le titre de la fenêtre actuellement sélectionnée
+    std::wstring currentTitle;
+    auto* tab = currentTab();
+    if (tab && !tab->targetWindowTitle.empty()) {
+        currentTitle = tab->targetWindowTitle;
+    }
+    
     SendMessage(m_comboWindows, CB_RESETCONTENT, 0, 0);
     m_windowList = ImageDetector::enumerateWindows();
     
-    for (const auto& [hwnd, title] : m_windowList) {
+    int newIndex = -1;
+    for (size_t i = 0; i < m_windowList.size(); i++) {
+        const auto& [hwnd, title] = m_windowList[i];
         std::wstring displayText = title;
         if (displayText.length() > 60) {
             displayText = displayText.substr(0, 57) + L"...";
         }
         SendMessageW(m_comboWindows, CB_ADDSTRING, 0, (LPARAM)displayText.c_str());
+        
+        // Retrouver la fenêtre par son titre
+        if (!currentTitle.empty() && title == currentTitle) {
+            newIndex = (int)i;
+        }
     }
     
     // Restaurer la sélection pour l'onglet courant
-    if (auto* tab = currentTab()) {
-        if (tab->selectedWindowIndex >= 0) {
-            SendMessage(m_comboWindows, CB_SETCURSEL, tab->selectedWindowIndex, 0);
+    if (tab) {
+        if (newIndex >= 0) {
+            tab->selectedWindowIndex = newIndex;
+            tab->targetWindow = m_windowList[newIndex].first;
+            tab->detector->setTargetWindow(m_windowList[newIndex].first);
+            SendMessage(m_comboWindows, CB_SETCURSEL, newIndex, 0);
+        } else if (!currentTitle.empty()) {
+            // La fenêtre n'existe plus
+            tab->selectedWindowIndex = -1;
+            tab->targetWindow = nullptr;
+            tab->detector->setTargetWindow(nullptr);
+            SendMessage(m_comboWindows, CB_SETCURSEL, -1, 0);
         }
     }
 }
@@ -1889,7 +1937,6 @@ void MainWindow::applyTheme() {
     SetWindowTheme(m_btnRefreshWindows, theme, nullptr);
     SetWindowTheme(m_btnAddTab, theme, nullptr);
     SetWindowTheme(m_btnRemoveTab, theme, nullptr);
-    SetWindowTheme(m_btnRenameTab, theme, nullptr);
     SetWindowTheme(m_btnCounterMinus, theme, nullptr);
     SetWindowTheme(m_btnCounterPlus, theme, nullptr);
     

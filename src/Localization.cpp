@@ -52,7 +52,7 @@ Localization::Localization() {
     m_french[L"error_no_window"] = L"Veuillez d'abord sélectionner une fenêtre cible.";
     m_french[L"error_need_one_tab"] = L"Vous devez garder au moins un onglet.";
     m_french[L"error_scan_interval"] = L"L'intervalle de scan doit être entre 50 et 5000 ms.";
-    m_french[L"error_cooldown"] = L"Le cooldown doit être entre 0 et 10000 ms.";
+    m_french[L"error_cooldown"] = L"Le cooldown doit être entre 0 et 300000 ms (5 min).";
     
     // Thème
     m_french[L"theme"] = L"Thème:";
@@ -185,7 +185,7 @@ Localization::Localization() {
     m_english[L"error_no_window"] = L"Please select a target window first.";
     m_english[L"error_need_one_tab"] = L"You must keep at least one tab.";
     m_english[L"error_scan_interval"] = L"Scan interval must be between 50 and 5000 ms.";
-    m_english[L"error_cooldown"] = L"Cooldown must be between 0 and 10000 ms.";
+    m_english[L"error_cooldown"] = L"Cooldown must be between 0 and 300000 ms (5 min).";
     
     // Theme
     m_english[L"theme"] = L"Theme:";

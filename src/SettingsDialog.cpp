@@ -447,10 +447,10 @@ void SettingsDialog::createDetectionTab(HWND hwnd) {
         0, 0, 0, 0,
         hwnd, (HMENU)IDC_SPIN_COOLDOWN, m_hInstance, nullptr);
     SendMessage(spinCooldown, UDM_SETBUDDY, (WPARAM)editCooldown, 0);
-    SendMessage(spinCooldown, UDM_SETRANGE32, 0, 10000);
+    SendMessage(spinCooldown, UDM_SETRANGE32, 0, 300000);
     m_detectionControls.push_back(spinCooldown);
     
-    HWND labelMs2 = CreateWindowExW(0, L"STATIC", L"(0 - 10000)",
+    HWND labelMs2 = CreateWindowExW(0, L"STATIC", L"(0 - 300000)",
         WS_CHILD | WS_VISIBLE,
         leftMargin + labelWidth + 90, baseY + 3, 100, 20,
         hwnd, nullptr, m_hInstance, nullptr);
@@ -976,7 +976,7 @@ bool SettingsDialog::validateSettings(HWND hwnd) {
     }
     
     int cooldown = GetDlgItemInt(hwnd, IDC_EDIT_COOLDOWN, nullptr, FALSE);
-    if (cooldown < 0 || cooldown > 10000) {
+    if (cooldown < 0 || cooldown > 300000) {
         MessageBoxW(hwnd, TR("error_cooldown"), 
             TR("validation"), MB_OK | MB_ICONWARNING);
         SetFocus(GetDlgItem(hwnd, IDC_EDIT_COOLDOWN));
