@@ -1635,8 +1635,10 @@ void MainWindow::saveTabSettings(CounterTab* tab, const std::wstring& path) {
         // Sauvegarder l'image avec OpenCV
         cv::Mat refImage = tab->detector->getReferenceImage();
         if (!refImage.empty()) {
-            // Convertir wstring en string pour OpenCV
-            std::string pathStr(refImagePath.begin(), refImagePath.end());
+            // Convertir wstring en string UTF-8 pour OpenCV
+            int size = WideCharToMultiByte(CP_UTF8, 0, refImagePath.c_str(), -1, nullptr, 0, nullptr, nullptr);
+            std::string pathStr(size - 1, 0);
+            WideCharToMultiByte(CP_UTF8, 0, refImagePath.c_str(), -1, &pathStr[0], size, nullptr, nullptr);
             cv::imwrite(pathStr, refImage);
         }
     }
