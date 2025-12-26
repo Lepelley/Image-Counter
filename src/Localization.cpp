@@ -51,8 +51,8 @@ Localization::Localization() {
     m_french[L"error_no_reference"] = L"Veuillez d'abord charger une image de référence.";
     m_french[L"error_no_window"] = L"Veuillez d'abord sélectionner une fenêtre cible.";
     m_french[L"error_need_one_tab"] = L"Vous devez garder au moins un onglet.";
-    m_french[L"error_scan_interval"] = L"L'intervalle de scan doit être entre 50 et 5000 ms.";
-    m_french[L"error_cooldown"] = L"Le cooldown doit être entre 0 et 300000 ms (5 min).";
+    m_french[L"error_scan_interval"] = L"L'intervalle de scan doit être entre 0.05 et 5 secondes.";
+    m_french[L"error_cooldown"] = L"Le cooldown doit être entre 0 et 300 secondes.";
     
     // Thème
     m_french[L"theme"] = L"Thème:";
@@ -74,10 +74,12 @@ Localization::Localization() {
     
     // Paramètres - Détection
     m_french[L"threshold"] = L"Seuil de détection:";
-    m_french[L"scan_interval"] = L"Intervalle de scan (ms):";
-    m_french[L"cooldown"] = L"Délai entre détections (ms):";
+    m_french[L"scan_interval"] = L"Intervalle de scan:";
+    m_french[L"cooldown"] = L"Délai entre détections:";
     m_french[L"detect_multiple"] = L"Détecter plusieurs occurrences";
     m_french[L"detection_info"] = L"Le cooldown empêche de compter plusieurs fois\r\nla même apparition d'image.";
+    m_french[L"seconds_short"] = L"s (0.05 - 5)";
+    m_french[L"seconds_cooldown"] = L"s (0 - 300)";
     m_french[L"status_settings_updated"] = L"Statut: Paramètres mis à jour";
     m_french[L"status_defaults_reset"] = L"Paramètres réinitialisés aux valeurs par défaut.";
     
@@ -184,8 +186,8 @@ Localization::Localization() {
     m_english[L"error_no_reference"] = L"Please load a reference image first.";
     m_english[L"error_no_window"] = L"Please select a target window first.";
     m_english[L"error_need_one_tab"] = L"You must keep at least one tab.";
-    m_english[L"error_scan_interval"] = L"Scan interval must be between 50 and 5000 ms.";
-    m_english[L"error_cooldown"] = L"Cooldown must be between 0 and 300000 ms (5 min).";
+    m_english[L"error_scan_interval"] = L"Scan interval must be between 0.05 and 5 seconds.";
+    m_english[L"error_cooldown"] = L"Cooldown must be between 0 and 300 seconds.";
     
     // Theme
     m_english[L"theme"] = L"Theme:";
@@ -207,12 +209,14 @@ Localization::Localization() {
     
     // Settings - Detection
     m_english[L"threshold"] = L"Detection threshold:";
-    m_english[L"scan_interval"] = L"Scan interval (ms):";
-    m_english[L"cooldown"] = L"Cooldown between detections (ms):";
+    m_english[L"scan_interval"] = L"Scan interval:";
+    m_english[L"cooldown"] = L"Cooldown between detections:";
     m_english[L"detect_multiple"] = L"Detect multiple occurrences";
     m_english[L"detection_info"] = L"The cooldown prevents counting the same\r\nimage appearance multiple times.";
     m_english[L"status_settings_updated"] = L"Status: Settings updated";
     m_english[L"status_defaults_reset"] = L"Settings reset to default values.";
+    m_english[L"seconds_short"] = L"s (0.05 - 5)";
+    m_english[L"seconds_cooldown"] = L"s (0 - 300)";
     
     // Settings - Region
     m_english[L"capture_region"] = L"Capture region";

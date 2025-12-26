@@ -186,8 +186,8 @@ private:
 // ============================================================================
 struct DetectionConfig {
     double threshold = 0.85;
-    int scanIntervalMs = 500;
-    int cooldownMs = 1000;
+    int scanIntervalMs = 500;      // En millisecondes en interne
+    int cooldownMs = 10000;        // 10 secondes par défaut
     bool detectMultiple = false;
     int counterStep = 1;
     bool useGrayscale = false;

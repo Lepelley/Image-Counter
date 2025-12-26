@@ -349,17 +349,17 @@ void SettingsDialog::createTabControl(HWND hwnd) {
         }, 1, 0);
     }
     
-    // Ajouter les onglets
+    // Ajouter les onglets (Compteur en premier)
     TCITEMW tie = {};
     tie.mask = TCIF_TEXT;
     
-    tie.pszText = const_cast<LPWSTR>(TR("tab_detection"));
+    tie.pszText = const_cast<LPWSTR>(TR("tab_counter"));
     TabCtrl_InsertItem(m_tabControl, 0, &tie);
     
-    tie.pszText = const_cast<LPWSTR>(TR("tab_region"));
+    tie.pszText = const_cast<LPWSTR>(TR("tab_detection"));
     TabCtrl_InsertItem(m_tabControl, 1, &tie);
     
-    tie.pszText = const_cast<LPWSTR>(TR("tab_counter"));
+    tie.pszText = const_cast<LPWSTR>(TR("tab_region"));
     TabCtrl_InsertItem(m_tabControl, 2, &tie);
     
     tie.pszText = const_cast<LPWSTR>(TR("tab_advanced"));
@@ -400,59 +400,43 @@ void SettingsDialog::createDetectionTab(HWND hwnd) {
     
     baseY += rowHeight + 5;
     
-    // Intervalle de scan
+    // Intervalle de scan (en secondes)
     HWND label2 = CreateWindowExW(0, L"STATIC", TR("scan_interval"),
         WS_CHILD | WS_VISIBLE,
         leftMargin, baseY + 3, labelWidth, 20,
         hwnd, nullptr, m_hInstance, nullptr);
     m_detectionControls.push_back(label2);
     
-    HWND editScan = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"500",
-        WS_CHILD | WS_VISIBLE | ES_NUMBER | ES_RIGHT,
+    HWND editScan = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"0.5",
+        WS_CHILD | WS_VISIBLE | ES_RIGHT,
         leftMargin + labelWidth, baseY, 80, 24,
         hwnd, (HMENU)IDC_EDIT_SCAN_INTERVAL, m_hInstance, nullptr);
     m_detectionControls.push_back(editScan);
     
-    HWND spinScan = CreateWindowExW(0, UPDOWN_CLASSW, L"",
-        WS_CHILD | WS_VISIBLE | UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_ARROWKEYS,
-        0, 0, 0, 0,
-        hwnd, (HMENU)IDC_SPIN_SCAN_INTERVAL, m_hInstance, nullptr);
-    SendMessage(spinScan, UDM_SETBUDDY, (WPARAM)editScan, 0);
-    SendMessage(spinScan, UDM_SETRANGE32, 50, 5000);
-    m_detectionControls.push_back(spinScan);
-    
-    HWND labelMs1 = CreateWindowExW(0, L"STATIC", L"(50 - 5000)",
+    HWND labelMs1 = CreateWindowExW(0, L"STATIC", TR("seconds_short"),
         WS_CHILD | WS_VISIBLE,
-        leftMargin + labelWidth + 90, baseY + 3, 100, 20,
+        leftMargin + labelWidth + 85, baseY + 3, 100, 20,
         hwnd, nullptr, m_hInstance, nullptr);
     m_detectionControls.push_back(labelMs1);
     
     baseY += rowHeight;
     
-    // Cooldown
+    // Cooldown (en secondes)
     HWND label3 = CreateWindowExW(0, L"STATIC", TR("cooldown"),
         WS_CHILD | WS_VISIBLE,
         leftMargin, baseY + 3, labelWidth, 20,
         hwnd, nullptr, m_hInstance, nullptr);
     m_detectionControls.push_back(label3);
     
-    HWND editCooldown = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"1000",
-        WS_CHILD | WS_VISIBLE | ES_NUMBER | ES_RIGHT,
+    HWND editCooldown = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"10",
+        WS_CHILD | WS_VISIBLE | ES_RIGHT,
         leftMargin + labelWidth, baseY, 80, 24,
         hwnd, (HMENU)IDC_EDIT_COOLDOWN, m_hInstance, nullptr);
     m_detectionControls.push_back(editCooldown);
     
-    HWND spinCooldown = CreateWindowExW(0, UPDOWN_CLASSW, L"",
-        WS_CHILD | WS_VISIBLE | UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_ARROWKEYS,
-        0, 0, 0, 0,
-        hwnd, (HMENU)IDC_SPIN_COOLDOWN, m_hInstance, nullptr);
-    SendMessage(spinCooldown, UDM_SETBUDDY, (WPARAM)editCooldown, 0);
-    SendMessage(spinCooldown, UDM_SETRANGE32, 0, 300000);
-    m_detectionControls.push_back(spinCooldown);
-    
-    HWND labelMs2 = CreateWindowExW(0, L"STATIC", L"(0 - 300000)",
+    HWND labelMs2 = CreateWindowExW(0, L"STATIC", TR("seconds_cooldown"),
         WS_CHILD | WS_VISIBLE,
-        leftMargin + labelWidth + 90, baseY + 3, 100, 20,
+        leftMargin + labelWidth + 85, baseY + 3, 100, 20,
         hwnd, nullptr, m_hInstance, nullptr);
     m_detectionControls.push_back(labelMs2);
     
@@ -764,11 +748,12 @@ void SettingsDialog::showTabPage(int tabIndex) {
     hideAllTabs();
     m_currentTab = tabIndex;
     
+    // Ordre: 0=Compteur, 1=Détection, 2=Zone, 3=Avancé
     std::vector<HWND>* controls = nullptr;
     switch (tabIndex) {
-        case 0: controls = &m_detectionControls; break;
-        case 1: controls = &m_regionControls; break;
-        case 2: controls = &m_counterControls; break;
+        case 0: controls = &m_counterControls; break;
+        case 1: controls = &m_detectionControls; break;
+        case 2: controls = &m_regionControls; break;
         case 3: controls = &m_advancedControls; break;
     }
     
@@ -873,8 +858,13 @@ void SettingsDialog::loadConfigToUI(HWND hwnd) {
         (int)(m_config.detection.threshold * 100));
     updateThresholdDisplay(hwnd);
     
-    SetDlgItemInt(hwnd, IDC_EDIT_SCAN_INTERVAL, m_config.detection.scanIntervalMs, FALSE);
-    SetDlgItemInt(hwnd, IDC_EDIT_COOLDOWN, m_config.detection.cooldownMs, FALSE);
+    // Convertir ms en secondes pour l'affichage
+    wchar_t scanBuf[32], coolBuf[32];
+    swprintf_s(scanBuf, L"%.2f", m_config.detection.scanIntervalMs / 1000.0);
+    swprintf_s(coolBuf, L"%.1f", m_config.detection.cooldownMs / 1000.0);
+    SetDlgItemTextW(hwnd, IDC_EDIT_SCAN_INTERVAL, scanBuf);
+    SetDlgItemTextW(hwnd, IDC_EDIT_COOLDOWN, coolBuf);
+    
     CheckDlgButton(hwnd, IDC_CHECK_DETECT_MULTIPLE, 
         m_config.detection.detectMultiple ? BST_CHECKED : BST_UNCHECKED);
     
@@ -918,8 +908,14 @@ void SettingsDialog::saveUIToConfig(HWND hwnd) {
     // Onglet Détection
     int threshold = (int)SendDlgItemMessage(hwnd, IDC_SLIDER_THRESHOLD, TBM_GETPOS, 0, 0);
     m_config.detection.threshold = threshold / 100.0;
-    m_config.detection.scanIntervalMs = GetDlgItemInt(hwnd, IDC_EDIT_SCAN_INTERVAL, nullptr, FALSE);
-    m_config.detection.cooldownMs = GetDlgItemInt(hwnd, IDC_EDIT_COOLDOWN, nullptr, FALSE);
+    
+    // Convertir les secondes en millisecondes
+    wchar_t scanBuf[32], coolBuf[32];
+    GetDlgItemTextW(hwnd, IDC_EDIT_SCAN_INTERVAL, scanBuf, 32);
+    GetDlgItemTextW(hwnd, IDC_EDIT_COOLDOWN, coolBuf, 32);
+    m_config.detection.scanIntervalMs = (int)(_wtof(scanBuf) * 1000);
+    m_config.detection.cooldownMs = (int)(_wtof(coolBuf) * 1000);
+    
     m_config.detection.detectMultiple = (IsDlgButtonChecked(hwnd, IDC_CHECK_DETECT_MULTIPLE) == BST_CHECKED);
     
     // Onglet Zone
@@ -967,16 +963,22 @@ void SettingsDialog::saveUIToConfig(HWND hwnd) {
 }
 
 bool SettingsDialog::validateSettings(HWND hwnd) {
-    int scanInterval = GetDlgItemInt(hwnd, IDC_EDIT_SCAN_INTERVAL, nullptr, FALSE);
-    if (scanInterval < 50 || scanInterval > 5000) {
+    // Valider l'intervalle de scan (0.05s - 5s)
+    wchar_t scanBuf[32];
+    GetDlgItemTextW(hwnd, IDC_EDIT_SCAN_INTERVAL, scanBuf, 32);
+    double scanInterval = _wtof(scanBuf);
+    if (scanInterval < 0.05 || scanInterval > 5.0) {
         MessageBoxW(hwnd, TR("error_scan_interval"), 
             TR("validation"), MB_OK | MB_ICONWARNING);
         SetFocus(GetDlgItem(hwnd, IDC_EDIT_SCAN_INTERVAL));
         return false;
     }
     
-    int cooldown = GetDlgItemInt(hwnd, IDC_EDIT_COOLDOWN, nullptr, FALSE);
-    if (cooldown < 0 || cooldown > 300000) {
+    // Valider le cooldown (0s - 300s)
+    wchar_t coolBuf[32];
+    GetDlgItemTextW(hwnd, IDC_EDIT_COOLDOWN, coolBuf, 32);
+    double cooldown = _wtof(coolBuf);
+    if (cooldown < 0 || cooldown > 300.0) {
         MessageBoxW(hwnd, TR("error_cooldown"), 
             TR("validation"), MB_OK | MB_ICONWARNING);
         SetFocus(GetDlgItem(hwnd, IDC_EDIT_COOLDOWN));
