@@ -309,6 +309,7 @@ struct CounterTab {
     
     // Fichier de sauvegarde
     std::wstring saveFilePath;
+    FILETIME lastFileWriteTime = {};  // Pour détecter les modifications externes
     
     // Image de référence
     std::wstring referenceImagePath;
@@ -415,9 +416,14 @@ private:
     void loadTabSettings(CounterTab* tab, const std::wstring& basePath);
     
     // Utilitaires
-    CounterTab* currentTab();
+   CounterTab* currentTab();
     void updatePreviewForTab(CounterTab* tab, const cv::Mat& image);
     void updateCapturePreview(CounterTab* tab);
+    
+    // Synchronisation des fichiers de compteur
+    void checkCounterFileChanges();
+    void syncCounterFromFile(CounterTab* tab);
+    FILETIME getFileWriteTime(const std::wstring& path);
 
     HINSTANCE m_hInstance;
     HWND m_hwnd = nullptr;

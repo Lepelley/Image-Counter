@@ -761,6 +761,15 @@ void MainWindow::onPaint(HWND hwnd) {
 }
 
 void MainWindow::onTimer(HWND hwnd) {
+    // Compteur pour limiter certaines vérifications
+    static int timerTick = 0;
+    timerTick++;
+    
+    // Vérifier les modifications de fichiers de compteur tous les 5 ticks (~500ms)
+    if (timerTick % 5 == 0) {
+        checkCounterFileChanges();
+    }
+    
     // Mettre à jour tous les compteurs actifs
     for (size_t i = 0; i < m_tabs.size(); i++) {
         auto& tab = m_tabs[i];
@@ -1565,6 +1574,9 @@ void MainWindow::saveCounterToFile(CounterTab* tab) {
     if (file.is_open()) {
         file << tab->detector->getCounter();
         file.close();
+        
+        // Mémoriser le temps de modification pour éviter de recharger notre propre écriture
+        tab->lastFileWriteTime = getFileWriteTime(tab->saveFilePath);
     }
 }
 
@@ -1583,8 +1595,59 @@ void MainWindow::loadCounterFromFile(CounterTab* tab) {
         file >> counter;
         file.close();
         
-        if (counter > 0) {
+        if (counter >= 0) {
             tab->detector->setCounter(counter);
+        }
+        
+        // Mémoriser le temps de modification
+        tab->lastFileWriteTime = getFileWriteTime(tab->saveFilePath);
+    }
+}
+
+FILETIME MainWindow::getFileWriteTime(const std::wstring& path) {
+    FILETIME ft = {};
+    HANDLE hFile = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+        nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile != INVALID_HANDLE_VALUE) {
+        GetFileTime(hFile, nullptr, nullptr, &ft);
+        CloseHandle(hFile);
+    }
+    return ft;
+}
+
+void MainWindow::syncCounterFromFile(CounterTab* tab) {
+    if (!tab || tab->saveFilePath.empty()) return;
+    
+    std::wifstream file(tab->saveFilePath);
+    if (file.is_open()) {
+        int counter = 0;
+        file >> counter;
+        file.close();
+        
+        if (counter >= 0 && counter != tab->detector->getCounter()) {
+            tab->detector->setCounter(counter);
+            
+            // Mettre à jour l'affichage si c'est l'onglet actif
+            if (tab == currentTab()) {
+                SetWindowTextW(m_staticCounter, std::to_wstring(counter).c_str());
+            }
+        }
+        
+        // Mettre à jour le temps de référence
+        tab->lastFileWriteTime = getFileWriteTime(tab->saveFilePath);
+    }
+}
+
+void MainWindow::checkCounterFileChanges() {
+    for (auto& tab : m_tabs) {
+        if (tab->saveFilePath.empty()) continue;
+        
+        FILETIME currentWriteTime = getFileWriteTime(tab->saveFilePath);
+        
+        // Comparer les temps de modification
+        if (CompareFileTime(&currentWriteTime, &tab->lastFileWriteTime) != 0) {
+            // Le fichier a été modifié depuis notre dernière lecture/écriture
+            syncCounterFromFile(tab.get());
         }
     }
 }
